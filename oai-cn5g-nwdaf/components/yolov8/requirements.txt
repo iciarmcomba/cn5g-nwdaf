@@ -1,0 +1,11 @@
+# requirements.txt
+pymongo
+ultralytics
+opencv-python
+numpy
+torch
+torchvision
+torchaudio
+fastapi
+uvicorn
+pydantic

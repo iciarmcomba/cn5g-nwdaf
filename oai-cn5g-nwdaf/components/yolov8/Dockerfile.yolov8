@@ -1,0 +1,25 @@
+# Dockerfile para YOLOv8 en NWDAF
+FROM python:3.9-slim
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+
+# Crear directorio de trabajo
+WORKDIR /app
+
+# Copiar archivos necesarios
+COPY requirements.txt ./
+
+# Instalar dependencias de Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar el código de YOLOv8
+COPY . .
+
+# Exponer un puerto específico
+EXPOSE 8080/tcp
+
+# Definir el comando de ejecución
+CMD ["python3", "inference.py"]
