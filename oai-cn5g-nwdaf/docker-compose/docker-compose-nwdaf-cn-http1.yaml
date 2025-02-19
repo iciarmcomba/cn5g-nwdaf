@@ -184,6 +184,7 @@ services:
         volumes:
             - /etc/mongod.conf:/etc/mongod.conf
             - ./datasets/coco8:/coco8
+            - ./init-db.js:/docker-entrypoint-initdb.d/init-db.js  # Montamos el script de inicialización
         environment:
             - PUID=1000
             - PGID=1000
