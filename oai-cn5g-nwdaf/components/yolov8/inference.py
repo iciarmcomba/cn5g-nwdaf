@@ -5,6 +5,7 @@ from ultralytics import YOLO
 import base64
 from PIL import Image
 from io import BytesIO
+import glob
 
 # Conectar a MongoDB
 MONGO_URI = "mongodb://oai-nwdaf-database:27017"
@@ -44,7 +45,11 @@ print("Entrenamiento finalizado.")
 # Inferencia en nuevas imágenes
 # Filtrar solo las imágenes con extensiones válidas
 valid_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
-images_to_infer = [f for f in os.listdir(images_path) if os.path.splitext(f)[1].lower() in valid_extensions]
+#images_to_infer = [f for f in os.listdir(images_path) if os.path.splitext(f)[1].lower() in valid_extensions]
+images_to_infer = []
+for ext in valid_extensions:
+    images_to_infer.extend(glob.glob(os.path.join(images_path, '**', f'*{ext}'), recursive=True))
+print(f"Imágenes encontradas para inferencia: {images_to_infer}")  # DEPURACIÓN
 
 # Para cada imagen en la carpeta de imágenes, realizar la inferencia y almacenar los resultados
 for img_name in images_to_infer:
