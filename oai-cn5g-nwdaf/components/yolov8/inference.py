@@ -1,3 +1,4 @@
+from fastapi import FastAPI
 from pymongo import MongoClient
 import os
 import torch
@@ -6,6 +7,11 @@ import base64
 from PIL import Image
 from io import BytesIO
 import glob
+from pydantic import BaseModel
+from typing import List
+
+# Iniciar FastAPI
+app = FastAPI()
 
 # Conectar a MongoDB
 MONGO_URI = "mongodb://oai-nwdaf-database:27017"
@@ -39,26 +45,23 @@ data_yaml = "/coco8/coco8.yaml"
 # Entrenar el modelo con el dataset de MongoDB
 print("Iniciando entrenamiento...")
 model.train(data=data_yaml, epochs=10, imgsz=640, device=device)
-
 print("Entrenamiento finalizado.")
 
-# Inferencia en nuevas imágenes
 # Filtrar solo las imágenes con extensiones válidas
 valid_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
-#images_to_infer = [f for f in os.listdir(images_path) if os.path.splitext(f)[1].lower() in valid_extensions]
 images_to_infer = []
 for ext in valid_extensions:
     images_to_infer.extend(glob.glob(os.path.join(images_path, '**', f'*{ext}'), recursive=True))
 print(f"Imágenes encontradas para inferencia: {images_to_infer}")  # DEPURACIÓN
 
 # Para cada imagen en la carpeta de imágenes, realizar la inferencia y almacenar los resultados
+detections_list = []
 for img_name in images_to_infer:
     img_path = os.path.join(images_path, img_name)
     
     # Realizar la inferencia
     results = model(img_path)  # Resultados de la inferencia
     
-    # Iterar sobre los resultados para cada imagen
     for result in results:
         # Obtener las predicciones de las cajas delimitadoras
         boxes = result.boxes.xywh  # Obtener las cajas como coordenadas [x_center, y_center, width, height]
@@ -70,9 +73,9 @@ for img_name in images_to_infer:
         for i in range(len(boxes)):
             detection = {
                 "image": img_name,
-                "class_id": classes[int(result.boxes.cls[i])],  # ID de la clase
-                "class_name": classes[int(result.boxes.cls[i])],  # Nombre de la clase
-                "confidence": confidences[i].item(),  # Confianza de la detección
+                "class_id": classes[int(result.boxes.cls[i])],
+                "class_name": classes[int(result.boxes.cls[i])],
+                "confidence": confidences[i].item(),
                 "bbox": {
                     "x_center": boxes[i][0].item(),
                     "y_center": boxes[i][1].item(),
@@ -81,6 +84,7 @@ for img_name in images_to_infer:
                 }
             }
             detections.append(detection)
+        detections_list.extend(detections)
 
         # Insertar los resultados en MongoDB
         db.detections.insert_many(detections)  # Guardamos todos los resultados de una vez
@@ -100,3 +104,22 @@ for img_name in images_to_infer:
         db.images.insert_one(image_document)  # Guardamos la imagen y sus detecciones
 
 print("Inferencia y almacenamiento en MongoDB completado.")
+
+# Definir modelo de respuesta
+class DetectionResponse(BaseModel):
+    image: str
+    class_id: str
+    class_name: str
+    confidence: float
+    bbox: dict
+
+# Endpoint para obtener resultados de inferencia
+@app.get("/detections", response_model=List[DetectionResponse])
+async def get_detections():
+    detections = list(db.detections.find({}, {"_id": 0}))  # Obtener detecciones sin _id
+    return detections
+
+# Ejecutar FastAPI
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8080)

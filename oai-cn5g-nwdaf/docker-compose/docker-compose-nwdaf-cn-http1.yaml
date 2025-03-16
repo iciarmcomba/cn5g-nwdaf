@@ -164,11 +164,13 @@ services:
         environment:
             - MONGODB_URI=mongodb://192.168.74.156:27017
             - MONGODB_DATABASE_NAME=yolov8
-            - MONGODB_COLLECTION_NAME_AMF=amf
-            - MONGODB_COLLECTION_NAME_SMF=smf
+#            - MONGODB_COLLECTION_NAME_AMF=amf
+#            - MONGODB_COLLECTION_NAME_SMF=smf
             - SERVER_PORT=8080
         depends_on:
             - oai-nwdaf-database
+        ports:
+            - "8080:8080" # Exponer FastAPI" 
         healthcheck:
             test: netstat -ltn | grep -c 8080
             interval: 5s
