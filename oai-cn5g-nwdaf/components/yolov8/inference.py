@@ -11,7 +11,8 @@ import glob
 MONGO_URI = "mongodb://oai-nwdaf-database:27017"
 client = MongoClient(MONGO_URI)
 db = client.yolov8
-dataset_info = db.coco8.find_one({"dataset": "coco8"})
+#dataset_info = db.coco8.find_one({"dataset": "coco8"})
+dataset_info = db.brain.find_one({"dataset": "brain"})
 
 if dataset_info:
     images_path = dataset_info["images_path"]
@@ -34,7 +35,8 @@ model = YOLO(model_path)
 model.to(device)
 
 # Configurar el dataset para YOLOv8
-data_yaml = "/coco8/coco8.yaml"
+#data_yaml = "/coco8/coco8.yaml"
+data_yaml = "/brain/data.yaml"
 
 # Entrenar el modelo con el dataset de MongoDB
 print("Iniciando entrenamiento...")
