@@ -29,61 +29,15 @@
 package sbi
 
 import (
-	"context"
-	"encoding/json"
-	"log"
 	"net/http"
-
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// MongoDB Configuration
-var mongoURI = "mongodb://192.168.74.156:27017"
-var dbName = "yolov8"
-var collectionName = "detections"
-
-// Handler para consultar detecciones desde MongoDB
-func GetDetectionsHandler(w http.ResponseWriter, r *http.Request) {
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoURI))
-	if err != nil {
-		http.Error(w, "Error conectando a MongoDB", http.StatusInternalServerError)
-		log.Println("Error conectando a MongoDB:", err)
-		return
-	}
-	defer client.Disconnect(context.TODO())
-
-	collection := client.Database(dbName).Collection(collectionName)
-	cursor, err := collection.Find(context.TODO(), bson.M{})
-	if err != nil {
-		http.Error(w, "Error consultando MongoDB", http.StatusInternalServerError)
-		log.Println("Error consultando MongoDB:", err)
-		return
-	}
-	defer cursor.Close(context.TODO())
-
-	var detections []bson.M
-	if err = cursor.All(context.TODO(), &detections); err != nil {
-		http.Error(w, "Error leyendo los resultados", http.StatusInternalServerError)
-		log.Println("Error leyendo los resultados:", err)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(detections)
-}
-
 // ------------------------------------------------------------------------------
-// NewRouter - crea el router para el servidor HTTP.
+// NewRouter - create router for HTTP server.
 func NewRouter() http.Handler {
 	mux := http.NewServeMux()
-	// Registrar rutas existentes
+	// register routes
 	mux.HandleFunc(config.Amf.ApiRoute, storeAmfNotificationOnDB)
 	mux.HandleFunc(config.Smf.ApiRoute, storeSmfNotificationOnDB)
-	log.Println("Registrando ruta /detections")
-	// Nueva ruta para detecciones
-	mux.HandleFunc("/detections", GetDetectionsHandler)
-
 	return mux
 }
