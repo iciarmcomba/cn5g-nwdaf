@@ -7,12 +7,15 @@ from PIL import Image
 from io import BytesIO
 import glob
 
+print("-----------------BRAIN-TUMOR--------------")
+
 # Conectar a MongoDB
 MONGO_URI = "mongodb://oai-nwdaf-database:27017"
 client = MongoClient(MONGO_URI)
 db = client.yolov8
-#dataset_info = db.coco8.find_one({"dataset": "coco8"})
-dataset_info = db.brain.find_one({"dataset": "brain"})
+
+# Buscar dataset
+dataset_info = db["brain-tumor"].find_one({"dataset": "brain-tumor"})
 
 if dataset_info:
     images_path = dataset_info["images_path"]
@@ -35,15 +38,14 @@ model = YOLO(model_path)
 model.to(device)
 
 # Configurar el dataset para YOLOv8
-#data_yaml = "/coco8/coco8.yaml"
-data_yaml = "/brain/data.yaml"
+data_yaml = "/brain-tumor/data.yaml"
 
-# Entrenar el modelo con el dataset de MongoDB
+# Entrenar el modelo
 print("Iniciando entrenamiento...")
 model.train(data=data_yaml, epochs=10, imgsz=640, device=device)
 print("Entrenamiento finalizado.")
 
-# Inferencia en nuevas imágenes
+# Buscar imágenes para inferencia
 valid_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
 images_to_infer = []
 for ext in valid_extensions:
@@ -76,7 +78,8 @@ for img_path in images_to_infer:
             }
             detections.append(detection)
 
-        db.detections.insert_many(detections)
+        if detections:
+            db.detections.insert_many(detections)
 
         # Guardar imagen con bounding boxes
         result_path = "/tmp/detected.jpg"
