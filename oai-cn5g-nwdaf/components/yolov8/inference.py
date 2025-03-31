@@ -4,44 +4,35 @@ import torch
 from ultralytics import YOLO
 import base64
 from PIL import Image
-from io import BytesIO
 import glob
 
 # Conectar a MongoDB
 MONGO_URI = "mongodb://oai-nwdaf-database:27017"
 client = MongoClient(MONGO_URI)
 db = client.yolov8
-dataset_info = db.coco8.find_one({"dataset": "coco8"})
 
-if dataset_info:
-    images_path = dataset_info["images_path"]
-    labels_path = dataset_info["labels_path"]
-else:
+# Obtener info del dataset montado
+dataset_info = db.coco8.find_one({"dataset": "coco8"})
+if not dataset_info:
     raise ValueError("No se encontró el dataset en MongoDB")
 
-# Verificar si CUDA está disponible
+images_path = dataset_info["images_path"]
+
+# Usar GPU si está disponible
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"Usando dispositivo: {device}")
 
-# Descargar el modelo YOLOv8 si no está disponible
+# Descargar modelo preentrenado si no está
 model_path = "yolov8n.pt"
 if not os.path.exists(model_path):
     print("Descargando modelo YOLOv8...")
     os.system(f"wget -O {model_path} https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt")
 
-# Cargar el modelo
+# Cargar modelo preentrenado
 model = YOLO(model_path)
 model.to(device)
 
-# Configurar el dataset para YOLOv8
-data_yaml = "/coco8/coco8.yaml"
-
-# Entrenar el modelo con el dataset de MongoDB
-print("Iniciando entrenamiento...")
-model.train(data=data_yaml, epochs=10, imgsz=640, device=device)
-print("Entrenamiento finalizado.")
-
-# Inferencia en nuevas imágenes
+# Buscar imágenes a inferir
 valid_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
 images_to_infer = []
 for ext in valid_extensions:
@@ -55,40 +46,40 @@ for img_path in images_to_infer:
 
     for result in results:
         boxes = result.boxes.xywh
-        classes = result.names
+        class_ids = result.boxes.cls
         confidences = result.boxes.conf
+        names = result.names
 
         detections = []
         for i in range(len(boxes)):
-            detection = {
+            detections.append({
                 "image": os.path.basename(img_path),
-                "class_id": classes[int(result.boxes.cls[i])],
-                "class_name": classes[int(result.boxes.cls[i])],
-                "confidence": confidences[i].item(),
+                "class_id": int(class_ids[i]),
+                "class_name": names[int(class_ids[i])],
+                "confidence": float(confidences[i]),
                 "bbox": {
-                    "x_center": boxes[i][0].item(),
-                    "y_center": boxes[i][1].item(),
-                    "width": boxes[i][2].item(),
-                    "height": boxes[i][3].item()
+                    "x_center": float(boxes[i][0]),
+                    "y_center": float(boxes[i][1]),
+                    "width": float(boxes[i][2]),
+                    "height": float(boxes[i][3]),
                 }
-            }
-            detections.append(detection)
+            })
 
-        db.detections.insert_many(detections)
+        if detections:
+            db.detections.insert_many(detections)
 
-        # Guardar imagen con bounding boxes
-        result_path = "/tmp/detected.jpg"
-        result.save(filename=result_path)
+            # Guardar imagen con predicción
+            result_path = "/tmp/detected.jpg"
+            result.save(filename=result_path)
 
-        # Codificar imagen resultante
-        with open(result_path, "rb") as image_file:
-            img_base64 = base64.b64encode(image_file.read()).decode("utf-8")
+            # Codificar imagen a base64
+            with open(result_path, "rb") as image_file:
+                img_base64 = base64.b64encode(image_file.read()).decode("utf-8")
 
-        image_document = {
-            "image_name": os.path.basename(img_path),
-            "image_data": img_base64,
-            "detections": detections
-        }
-        db.images.insert_one(image_document)
+            db.images.insert_one({
+                "image_name": os.path.basename(img_path),
+                "image_data": img_base64,
+                "detections": detections
+            })
 
-print("Inferencia y almacenamiento en MongoDB completado.")
+print("Inferencia completada y resultados almacenados en MongoDB.")
