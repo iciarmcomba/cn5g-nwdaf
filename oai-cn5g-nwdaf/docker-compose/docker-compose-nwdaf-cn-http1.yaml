@@ -159,9 +159,9 @@ services:
         build:
             context: ../components/yolov8
             dockerfile: Dockerfile.yolov8
-        volumes:
-            - ./datasets/coco8:/coco8 #Dataset original
-            - ./output/inferenced_images:/output  # Carpeta donde se guardan imágenes con bounding boxes
+#        volumes:
+#            - ./datasets/coco8:/coco8 #Dataset original
+#            - ./output/inferenced_images:/output  # Carpeta donde se guardan imágenes con bounding boxes
         environment:
             - MONGODB_URI=mongodb://192.168.74.156:27017
             - MONGODB_DATABASE_NAME=yolov8
@@ -186,8 +186,8 @@ services:
         image: mongo:latest
         volumes:
             - /etc/mongod.conf:/etc/mongod.conf
-            - ./datasets/coco8:/coco8
-            - ./init-db.js:/docker-entrypoint-initdb.d/init-db.js  # Montamos el script de inicialización
+ #           - ./datasets/coco8:/coco8
+ #           - ./init-db.js:/docker-entrypoint-initdb.d/init-db.js  # Montamos el script de inicialización
         environment:
             - PUID=1000
             - PGID=1000

@@ -1,85 +1,76 @@
-from pymongo import MongoClient
-import os
-import torch
-from ultralytics import YOLO
-import base64
-from PIL import Image
-import glob
+import time
 
-# Conectar a MongoDB
-MONGO_URI = "mongodb://oai-nwdaf-database:27017"
-client = MongoClient(MONGO_URI)
-db = client.yolov8
+def main_loop():
+    while True:
+        pending_images = list(pending_collection.find())
+        if not pending_images:
+            print("⏳ Esperando imágenes...")
+            time.sleep(5)
+            continue
 
-# Obtener info del dataset montado
-dataset_info = db.coco8.find_one({"dataset": "coco8"})
-if not dataset_info:
-    raise ValueError("No se encontró el dataset en MongoDB")
+        print(f"🔍 {len(pending_images)} imágenes encontradas")
 
-images_path = dataset_info["images_path"]
+        for image_doc in pending_images:
+            try:
+                image_name = image_doc["image_name"]
+                image_data_base64 = image_doc["image_data"]
+                img_bytes = base64.b64decode(image_data_base64)
+                image = Image.open(BytesIO(img_bytes)).convert("RGB")
 
-# Usar GPU si está disponible
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-print(f"Usando dispositivo: {device}")
+                temp_path = f"/tmp/{image_name}"
+                image.save(temp_path)
 
-# Descargar modelo preentrenado si no está
-model_path = "yolov8n.pt"
-if not os.path.exists(model_path):
-    print("Descargando modelo YOLOv8...")
-    os.system(f"wget -O {model_path} https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt")
+                results = model(temp_path)
 
-# Cargar modelo preentrenado
-model = YOLO(model_path)
-model.to(device)
+                for result in results:
+                    boxes = result.boxes.xywh
+                    classes = result.names
+                    confidences = result.boxes.conf
 
-# Buscar imágenes a inferir
-valid_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
-images_to_infer = []
-for ext in valid_extensions:
-    images_to_infer.extend(glob.glob(os.path.join(images_path, '**', f'*{ext}'), recursive=True))
+                    detections = []
+                    for i in range(len(boxes)):
+                        detection = {
+                            "image": image_name,
+                            "class_id": int(result.boxes.cls[i]),
+                            "class_name": classes[int(result.boxes.cls[i])],
+                            "confidence": float(confidences[i]),
+                            "bbox": {
+                                "x_center": float(boxes[i][0]),
+                                "y_center": float(boxes[i][1]),
+                                "width": float(boxes[i][2]),
+                                "height": float(boxes[i][3])
+                            },
+                            "timestamp": datetime.datetime.utcnow()
+                        }
+                        detections.append(detection)
 
-print(f"Imágenes encontradas para inferencia: {images_to_infer}")
+                    if detections:
+                        detections_collection.insert_many(detections)
 
-# Inferencia y almacenamiento
-for img_path in images_to_infer:
-    results = model(img_path)
+                    # Guardar imagen con bounding boxes
+                    result_path = f"/tmp/detected_{image_name}"
+                    result.save(filename=result_path)
 
-    for result in results:
-        boxes = result.boxes.xywh
-        class_ids = result.boxes.cls
-        confidences = result.boxes.conf
-        names = result.names
+                    with open(result_path, "rb") as image_file:
+                        img_base64 = base64.b64encode(image_file.read()).decode("utf-8")
 
-        detections = []
-        for i in range(len(boxes)):
-            detections.append({
-                "image": os.path.basename(img_path),
-                "class_id": int(class_ids[i]),
-                "class_name": names[int(class_ids[i])],
-                "confidence": float(confidences[i]),
-                "bbox": {
-                    "x_center": float(boxes[i][0]),
-                    "y_center": float(boxes[i][1]),
-                    "width": float(boxes[i][2]),
-                    "height": float(boxes[i][3]),
-                }
-            })
+                    image_document = {
+                        "image_name": image_name,
+                        "image_data": img_base64,
+                        "detections": detections,
+                        "timestamp": datetime.datetime.utcnow()
+                    }
+                    images_collection.insert_one(image_document)
 
-        if detections:
-            db.detections.insert_many(detections)
+                    os.remove(temp_path)
+                    os.remove(result_path)
 
-            # Guardar imagen con predicción
-            result_path = "/tmp/detected.jpg"
-            result.save(filename=result_path)
+                pending_collection.delete_one({"_id": image_doc["_id"]})
+                print(f"✅ Procesada y eliminada: {image_name}")
 
-            # Codificar imagen a base64
-            with open(result_path, "rb") as image_file:
-                img_base64 = base64.b64encode(image_file.read()).decode("utf-8")
+            except Exception as e:
+                print(f"❌ Error procesando {image_doc.get('image_name')}: {e}")
+                continue
 
-            db.images.insert_one({
-                "image_name": os.path.basename(img_path),
-                "image_data": img_base64,
-                "detections": detections
-            })
-
-print("Inferencia completada y resultados almacenados en MongoDB.")
+if __name__ == "__main__":
+    main_loop()

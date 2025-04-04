@@ -100,6 +100,47 @@ func GetImageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ------------------------------------------------------------------------------
+// Handler para subir imagen desde el UE (gnbSIM)
+func UploadImageHandler(w http.ResponseWriter, r *http.Request) {
+	type UploadRequest struct {
+		ImageName string `json:"image_name"`
+		ImageData string `json:"image_data"`
+	}
+
+	var req UploadRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, "JSON inválido", http.StatusBadRequest)
+		log.Println("Error parseando JSON:", err)
+		return
+	}
+
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		http.Error(w, "MongoDB error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	defer client.Disconnect(context.TODO())
+
+	collection := client.Database(dbName).Collection("pending_images")
+
+	_, err = collection.InsertOne(context.TODO(), bson.M{
+		"image_name": req.ImageName,
+		"image_data": req.ImageData,
+		"processed":  false,
+	})
+	if err != nil {
+		http.Error(w, "Error guardando imagen", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("Imagen subida con éxito"))
+}
+
+// ------------------------------------------------------------------------------
 // NewRouter - crea el router para el servidor HTTP
 func NewRouter() http.Handler {
 	mux := http.NewServeMux()
@@ -111,7 +152,8 @@ func NewRouter() http.Handler {
 	// Nuevas rutas para detección e imágenes
 	mux.HandleFunc("/detections", GetDetectionsHandler)
 	mux.HandleFunc("/images/", GetImageHandler)
+	mux.HandleFunc("/upload", UploadImageHandler)
 
-	log.Println("Rutas registradas: /detections, /images/{image_name}")
+	log.Println("Rutas registradas: /detections, /images/{image_name}, /upload")
 	return mux
 }

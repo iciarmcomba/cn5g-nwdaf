@@ -29,6 +29,10 @@ services:
             - GTPuLocalAddr=192.168.72.141
             - GTPuIFname=eth1
 #           - DEREG_AFTER=20 # Deregister UE after 20 Sec
+        volumes:
+            - ../images-to-send:/images
+            - ../inferenced-results:/results
+            - ../scripts/send_images.sh:/scripts/send_images.sh
         networks:
             public_net:
                 ipv4_address: 192.168.70.141
@@ -39,6 +43,7 @@ services:
             interval: 10s
             timeout: 5s
             retries: 5
+
 networks:
     public_net:
         external:
