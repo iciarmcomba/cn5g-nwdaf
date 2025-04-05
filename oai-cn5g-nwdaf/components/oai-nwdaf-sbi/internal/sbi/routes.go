@@ -50,7 +50,7 @@ func GetDetectionsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ------------------------------------------------------------------------------
-// Handler para servir imágenes detectadas desde MongoDB
+// Handler para servir imágenes detectadas desde MongoDB al UE
 func GetImageHandler(w http.ResponseWriter, r *http.Request) {
 	imageName := strings.TrimPrefix(r.URL.Path, "/images/") // Extrae nombre de imagen
 
@@ -76,7 +76,8 @@ func GetImageHandler(w http.ResponseWriter, r *http.Request) {
 	err = collection.FindOne(context.TODO(), filter).Decode(&imgDoc)
 	if err != nil {
 		http.Error(w, "Imagen no encontrada", http.StatusNotFound)
-		log.Println("Imagen no encontrada:", err)
+//		log.Println("Imagen no encontrada:", err)
+		log.Printf("[SBI] Imagen '%s' todavía no disponible, reintentando...", imageName)
 		return
 	}
 
@@ -88,6 +89,7 @@ func GetImageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	imgBytes, err := base64.StdEncoding.DecodeString(imgBase64)
+	log.Printf("[SBI] Imagen inferida '%s' recuperdad de MongoDB y enviada a UE", imageName)
 	if err != nil {
 		http.Error(w, "Error decodificando la imagen", http.StatusInternalServerError)
 		log.Println("Error base64:", err)
@@ -130,6 +132,7 @@ func UploadImageHandler(w http.ResponseWriter, r *http.Request) {
 		"image_data": req.ImageData,
 		"processed":  false,
 	})
+	log.Printf("[SBI] Imagen '%s' recibida desde UE y guardada en la colección 'pending_images' de la base de datos", req.ImageName)
 	if err != nil {
 		http.Error(w, "Error guardando imagen", http.StatusInternalServerError)
 		log.Println(err)
