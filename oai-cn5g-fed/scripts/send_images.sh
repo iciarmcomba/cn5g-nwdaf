@@ -5,15 +5,15 @@ INPUT_DIR="/images"
 OUTPUT_DIR="/results"
 MAX_RETRIES=10
 SLEEP_BETWEEN_RETRIES=1
-
-CONTAINERS="gnbsim-vpp oai-nwdaf-sbi oai-nwdaf-yolov8 oai-nwdaf-database"
-RESOURCE_LOG="/results/resource_usage.log"
+PROCESSING_CSV="$OUTPUT_DIR/processing_times.csv"
 
 echo "Iniciando envío de imágenes desde $INPUT_DIR a $SBI_URL/upload"
 mkdir -p "$OUTPUT_DIR"
 
-total_time=0
-count=0
+# Crear CSV con encabezado si no existe
+if [ ! -f "$PROCESSING_CSV" ]; then
+    echo "Image,StartTime,EndTime,ProcessingTime(s)" > "$PROCESSING_CSV"
+fi
 
 for img in "$INPUT_DIR"/*.{jpg,jpeg,png}; do
     [ -e "$img" ] || continue
@@ -45,8 +45,7 @@ for img in "$INPUT_DIR"/*.{jpg,jpeg,png}; do
 	    end_time=$(date +%s%3N)
 	    duration=$((end_time - start_time))
             echo "Imagen inferida recibida: $filename. Duración del procesamiento: ${duration} ms"
-	    total_time=$((total_time + duration))
-	    count=$((count + 1))
+	    echo "$filename,$start_time,$end_time,$duration" >> "$PROCESSING_CSV"
             break
         }
         attempt=$((attempt+1))
