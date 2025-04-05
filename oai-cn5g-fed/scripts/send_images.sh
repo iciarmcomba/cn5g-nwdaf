@@ -56,13 +56,6 @@ for img in "$INPUT_DIR"/*.{jpg,jpeg,png}; do
     fi
 done
 
-if [ $count -gt 0 ]; then
-    average=$((total_time / count))
-    echo "Tiempo promedio de inferencia para $count imágenes: ${average} ms"
-else
-    echo "No se pudo calcular el promedio, ninguna imagen fue inferida correctamente."
-fi
-
 echo "Envío finalizado. Entrando en modo escucha pasiva (pull)..."
 
 echo "done" > /results/.monitor_stop
@@ -75,7 +68,7 @@ while true; do
         result_file="$OUTPUT_DIR/inferenced_$base"
 
         if [ ! -f "$result_file" ]; then
-            echo "🕵️ Reintentando recuperar resultado para $base..."
+            echo "Reintentando recuperar resultado para $base..."
             curl -s -f "$SBI_URL/images/$base" --output "$result_file" && \
                 echo "Imagen inferida recibida en escucha: $base"
         fi

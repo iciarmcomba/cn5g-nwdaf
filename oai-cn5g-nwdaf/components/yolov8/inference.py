@@ -30,10 +30,10 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"Usando dispositivo: {device}")
 
 # Cargar modelo preentrenado YOLOv8
-model_path = "yolov8n.pt"
+model_path = "yolov8m.pt"
 if not os.path.exists(model_path):
     print("Descargando modelo YOLOv8...")
-    os.system(f"wget -O {model_path} https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt")
+    os.system(f"wget -O {model_path} https://github.com/ultralytics/assets/releases/download/v8.3.0/{model_path}")
 
 model = YOLO(model_path)
 model.to(device)
