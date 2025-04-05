@@ -12,9 +12,6 @@ RESOURCE_LOG="/results/resource_usage.log"
 echo "Iniciando envío de imágenes desde $INPUT_DIR a $SBI_URL/upload"
 mkdir -p "$OUTPUT_DIR"
 
-#Pimera línea del log de recursos
-echo -e "Timestamp\tImage\tContainer\tCPU%\tMemUsage" > "$RESOURCE_LOG"
-
 total_time=0
 count=0
 
@@ -22,12 +19,6 @@ for img in "$INPUT_DIR"/*.{jpg,jpeg,png}; do
     [ -e "$img" ] || continue
     filename=$(basename "$img")
     echo "Enviando: $filename"
-
-    # Medición de recursos antes del envío
-    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    for c in $CONTAINERS; do
-        docker stats --no-stream --format "$timestamp\t$filename\t{{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}" $c >> "$RESOURCE_LOG"
-    done
 
     base64data=$(base64 "$img")
     json=$(jq -n --arg name "$filename" --arg data "$base64data" \
@@ -74,6 +65,8 @@ else
 fi
 
 echo "Envío finalizado. Entrando en modo escucha pasiva (pull)..."
+
+echo "done" > /results/.monitor_stop
 
 # Escucha pasiva cada 30s para ver si hay resultados nuevos
 while true; do
