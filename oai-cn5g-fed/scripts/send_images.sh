@@ -24,7 +24,7 @@ for img in "$INPUT_DIR"/*.{jpg,jpeg,png}; do
     json=$(jq -n --arg name "$filename" --arg data "$base64data" \
         '{image_name: $name, image_data: $data}')
 
-    start_time=$(date +%s%3N)
+    start_time=$(date +%s.%N)
 
     response=$(curl -s -X POST "$SBI_URL/upload" \
         -H "Content-Type: application/json" \
@@ -42,10 +42,11 @@ for img in "$INPUT_DIR"/*.{jpg,jpeg,png}; do
     while [ $attempt -lt $MAX_RETRIES ]; do
         sleep $SLEEP_BETWEEN_RETRIES
         curl -s -f "$SBI_URL/images/$filename" --output "$OUTPUT_DIR/inferenced_$filename" && {
-	    end_time=$(date +%s%3N)
-	    duration=$((end_time - start_time))
-            echo "Imagen inferida recibida: $filename. Duración del procesamiento: ${duration} ms"
-	    echo "$filename,$start_time,$end_time,$duration" >> "$PROCESSING_CSV"
+	    end_time=$(date +%s.%N)
+            duration=$(awk "BEGIN {print ($end_time - $start_time) * 1000}")
+            duration_ms=$(printf "%.4f" "$duration")
+            echo "Imagen inferida recibida: $filename. Duración del procesamiento: ${duration_ms} ms"
+            echo "$filename,$start_time,$end_time,$duration_ms" >> "$PROCESSING_CSV"
             break
         }
         attempt=$((attempt+1))
