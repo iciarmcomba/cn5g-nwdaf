@@ -15,17 +15,25 @@ client = MongoClient(MONGO_URI)
 db = client.yolov8
 pending_collection = db.pending_images
 images_collection = db.images
-INFERENCE_CSV = "/results/inference_times.csv"
+
+# Ficheros CSV para guardar métricas
+INFERENCE_CSV = "/results/inference_times_medium.csv"
+TOTAL_CSV = "/results/total_processing_times_medium.csv"
 
 # Crear carpeta de resultados si no existe
 OUTPUT_DIR = "/results"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Crear CSV si no existe
+# Crear CSVs si no existen
 if not os.path.exists(INFERENCE_CSV):
     with open(INFERENCE_CSV, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["Image", "Inference Time (ms)"])
+
+if not os.path.exists(TOTAL_CSV):
+    with open(TOTAL_CSV, "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Image", "Total Processing Time (ms)"])
 
 # Verificar CUDA
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -41,6 +49,8 @@ model.to(device)
 
 # --- Procesar Imagen ---
 def process_image(image_doc):
+    processing_start = time.time()  # ⏱️ Empezar medición total
+
     image_name = image_doc["image_name"]
     image_data_base64 = image_doc["image_data"]
     img_bytes = base64.b64decode(image_data_base64)
@@ -50,19 +60,19 @@ def process_image(image_doc):
     image.save(temp_path)
 
     # Medir tiempo de inferencia
-    start_time = time.time()
+    inference_start = time.time()
     results = model(temp_path)
-    end_time = time.time()
-    elapsed_ms = round((end_time - start_time) * 1000, 4)
+    inference_end = time.time()
+    inference_elapsed_ms = round((inference_end - inference_start) * 1000, 2)
 
-    # Guardar tiempo en CSV
+    # Guardar tiempo de inferencia
     with open(INFERENCE_CSV, "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow([image_name, elapsed_ms])
+        writer.writerow([image_name, inference_elapsed_ms])
 
-    print(f"{image_name} inferida en {elapsed_ms} ms")
+    print(f"{image_name} inferida en {inference_elapsed_ms} ms")
 
-    # Guardar resultado procesado
+    # Guardar resultados
     for result in results:
         boxes = result.boxes.xywh
         classes = result.names
@@ -98,6 +108,16 @@ def process_image(image_doc):
             "timestamp": datetime.datetime.utcnow()
         }
         images_collection.insert_one(image_document)
+
+    processing_end = time.time()
+    total_elapsed_ms = round((processing_end - processing_start) * 1000, 2)
+
+    # Guardar tiempo total
+    with open(TOTAL_CSV, "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow([image_name, total_elapsed_ms])
+
+    print(f"{image_name} procesada completamente en {total_elapsed_ms} ms")
 
     os.remove(temp_path)
     os.remove(result_path)
