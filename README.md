@@ -1,0 +1,1 @@
+This Branch has the complete implementation for YOLOv8 medium, please use this branch when the medium model wants to be used for inference of the images and for taking the output measurements for this model.
