@@ -160,7 +160,8 @@ services:
             context: ../components/yolov8
             dockerfile: Dockerfile.yolov8
         volumes:
-            - ./datasets/coco8:/coco8
+            - ./datasets/coco8:/coco8 #Dataset original
+            - ./output/inferenced_images:/output  # Carpeta donde se guardan imágenes con bounding boxes
         environment:
             - MONGODB_URI=mongodb://192.168.74.156:27017
             - MONGODB_DATABASE_NAME=yolov8
@@ -205,6 +206,8 @@ services:
     oai-nwdaf-sbi:
         container_name: oai-nwdaf-sbi
         image: oai-nwdaf-sbi:latest
+        volumes:
+            - ./output/inferenced_images:/output           # Montamos también aquí para servir las imágenes
         environment:
             - AMF_IP_ADDR=http://192.168.70.132
             - AMF_HTTP_VERSION=1
